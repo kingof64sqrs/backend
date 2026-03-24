@@ -16,6 +16,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(20), unique=True, index=True, nullable=True)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    username: Mapped[str | None] = mapped_column(String(40), unique=True, index=True, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
     interests: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array: ["Cafes", "Events"]
     lat: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
