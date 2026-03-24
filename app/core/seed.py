@@ -81,7 +81,7 @@ async def seed_if_empty(db: AsyncSession) -> None:
     # Create demo user (for seeded posts)
     demo_phone = "9999999999"
     demo = User(
-        email=f"{demo_phone}@aroundyou.local",
+        email=f"{demo_phone}@aroundyou.app",
         phone=demo_phone,
         name="Demo User",
         hashed_password=hash_password(demo_phone),

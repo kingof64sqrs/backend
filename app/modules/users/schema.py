@@ -1,17 +1,20 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class UserPublic(BaseModel):
     id: str
-    email: EmailStr
+    email: str
     phone: str | None = None
     name: str | None = None
+    interests: list[str] | None = None  # e.g., ["Cafes", "Events"]
+    lat: float | None = None
+    lon: float | None = None
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     name: str | None = Field(default=None, max_length=120)
     password: str = Field(min_length=8, max_length=128)
 
@@ -21,14 +24,12 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class OtpRequest(BaseModel):
-    phone: str = Field(min_length=10, max_length=20)
-
-
-class OtpVerify(BaseModel):
-    phone: str = Field(min_length=10, max_length=20)
-    code: str = Field(min_length=4, max_length=8)
+class GoogleSignInRequest(BaseModel):
+    id_token: str = Field(min_length=20)
 
 
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
+    interests: list[str] | None = None
+    lat: float | None = None
+    lon: float | None = None

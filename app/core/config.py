@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import AnyUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).resolve().parents[2] / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_env: str = "dev"
     app_name: str = "Aroundyou API"
@@ -17,6 +22,7 @@ class Settings(BaseSettings):
         "http://localhost:19006",
         "http://localhost:8081",
     ]
+    cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
     database_url: str = "postgresql+asyncpg://aroundyou:aroundyou@localhost:5432/aroundyou"
     redis_url: str = "redis://localhost:6379/0"
@@ -27,6 +33,14 @@ class Settings(BaseSettings):
     jwt_secret: str = "change_me"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 24 * 30
+    google_web_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    frontend_auth_success_url: str = "http://localhost:8082"
+
+    # Startup behavior controls
+    auto_schema_sync: bool = True
+    auto_seed_dev_data: bool = True
 
 
 @lru_cache

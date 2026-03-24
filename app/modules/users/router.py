@@ -6,16 +6,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
 from app.core.db import get_db
-from app.modules.users.schema import OtpRequest, OtpVerify, TokenResponse, UserCreate, UserPublic, UserUpdate
-from app.modules.users.service import authenticate_user, login_with_dummy_otp, register_user, update_profile
+from app.modules.users.schema import GoogleSignInRequest, TokenResponse, UserCreate, UserPublic, UserUpdate
+from app.modules.users.service import authenticate_user, login_with_google, register_user, update_profile, _deserialize_interests
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+def _user_to_public(user) -> UserPublic:
+    """Convert User model to UserPublic schema."""
+    return UserPublic(
+        id=user.id,
+        email=user.email,
+        phone=user.phone,
+        name=user.name,
+        interests=_deserialize_interests(user.interests),
+        lat=user.lat,
+        lon=user.lon,
+    )
 
 
 @router.post("/register", response_model=UserPublic)
 async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> UserPublic:
     user = await register_user(db, email=payload.email, password=payload.password, name=payload.name)
-    return UserPublic(id=user.id, email=user.email, name=user.name)
+    return _user_to_public(user)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -27,22 +40,15 @@ async def login(
     return TokenResponse(access_token=token)
 
 
-@router.post("/otp/request")
-async def otp_request(payload: OtpRequest) -> dict:
-    # Dummy implementation: we "sent" OTP.
-    # Frontend will accept 9999 for now.
-    return {"status": "ok", "sent": True}
-
-
-@router.post("/otp/verify", response_model=TokenResponse)
-async def otp_verify(payload: OtpVerify, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    token = await login_with_dummy_otp(db, phone=payload.phone, code=payload.code)
+@router.post("/google/signin", response_model=TokenResponse)
+async def google_signin(payload: GoogleSignInRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    token = await login_with_google(db, id_token_str=payload.id_token)
     return TokenResponse(access_token=token)
 
 
 @router.get("/me", response_model=UserPublic)
 async def me(user=Depends(get_current_user)) -> UserPublic:
-    return UserPublic(id=user.id, email=user.email, phone=user.phone, name=user.name)
+    return _user_to_public(user)
 
 
 @router.patch("/me", response_model=UserPublic)
@@ -51,5 +57,12 @@ async def update_me(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserPublic:
-    updated = await update_profile(db, user=user, name=payload.name)
-    return UserPublic(id=updated.id, email=updated.email, phone=updated.phone, name=updated.name)
+    updated = await update_profile(
+        db,
+        user=user,
+        name=payload.name,
+        interests=payload.interests,
+        lat=payload.lat,
+        lon=payload.lon,
+    )
+    return _user_to_public(updated)

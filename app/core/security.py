@@ -7,7 +7,10 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# NOTE: bcrypt has a hard 72-byte password limit and can be sensitive to
+# passlib/bcrypt version mismatches. For dev + OTP flows we use PBKDF2,
+# which avoids those issues.
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:

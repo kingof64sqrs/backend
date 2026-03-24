@@ -56,21 +56,6 @@ async def list_(
     ]
 
 
-@router.get("/{place_id}", response_model=PlacePublic)
-async def get_(place_id: str, db: AsyncSession = Depends(get_db)) -> PlacePublic:
-    place = await get_place(db, place_id=place_id)
-    if place is None:
-        raise not_found("Place not found")
-    return PlacePublic(
-        id=place.id,
-        name=place.name,
-        category=place.category,
-        lat=place.lat,
-        lon=place.lon,
-        metadata_json=place.metadata_json,
-    )
-
-
 @router.get("/nearby", response_model=list[PlacePublic])
 async def nearby(
     lat: float,
@@ -91,6 +76,21 @@ async def nearby(
         )
         for p in places
     ]
+
+
+@router.get("/{place_id}", response_model=PlacePublic)
+async def get_(place_id: str, db: AsyncSession = Depends(get_db)) -> PlacePublic:
+    place = await get_place(db, place_id=place_id)
+    if place is None:
+        raise not_found("Place not found")
+    return PlacePublic(
+        id=place.id,
+        name=place.name,
+        category=place.category,
+        lat=place.lat,
+        lon=place.lon,
+        metadata_json=place.metadata_json,
+    )
 
 
 @router.post("/{place_id}/presence")

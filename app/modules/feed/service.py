@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 
 from sqlalchemy import select
@@ -9,6 +10,7 @@ from app.core.qdrant_client import get_qdrant
 from app.core.redis_client import get_redis
 from app.modules.places.model import Place
 from app.modules.posts.model import Post
+from app.modules.users.model import User
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,33 @@ async def nearby_posts(db: AsyncSession, *, lat: float, lon: float, radius_meter
     return list(result.scalars().all())
 
 
+async def interest_based_posts(db: AsyncSession, *, interests: list[str], limit: int) -> list[Post]:
+    """Get posts from places matching user's interests."""
+    if not interests:
+        return []
+    
+    # Find places with matching categories  
+    places = (
+        await db.execute(
+            select(Place.id)
+            .where(Place.category.in_(interests))
+            .order_by(Place.created_at.desc())
+            .limit(100)
+        )
+    ).scalars().all()
+    
+    if not places:
+        return []
+    
+    result = await db.execute(
+        select(Post)
+        .where(Post.place_id.in_(list(places)))
+        .order_by(Post.created_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
 async def personalized_posts(db: AsyncSession, *, user_id: str, limit: int) -> list[Post]:
     # Minimal integration point:
     # If Qdrant is not configured/seeded yet, just return empty.
@@ -83,33 +112,80 @@ async def personalized_posts(db: AsyncSession, *, user_id: str, limit: int) -> l
 async def build_feed(
     db: AsyncSession,
     *,
-    user_id: str,
+    user: User,
     limit: int,
     lat: float | None,
     lon: float | None,
 ) -> list[tuple[str, Post]]:
+    logger.info(f"[BuildFeed] Starting for user {user.id}, interests={user.interests}, lat={lat}, lon={lon}")
     remaining = limit
     out: list[tuple[str, Post]] = []
 
-    for p in await trending_posts(db, limit=min(remaining, 15)):
-        out.append(("trending", p))
-    remaining = limit - len(out)
+    # Parse user interests if available
+    interests: list[str] = []
+    if user.interests:
+        try:
+            interests = json.loads(user.interests)
+            logger.info(f"[BuildFeed] Parsed interests: {interests}")
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse user interests: %s", user.interests)
 
+    # Interest-based posts (personalized)
+    if interests:
+        try:
+            posts = await interest_based_posts(db, interests=interests, limit=min(remaining, 10))
+            logger.info(f"[BuildFeed] Got {len(posts)} interest-based posts")
+            for p in posts:
+                out.append(("interest", p))
+            remaining = limit - len(out)
+        except Exception as e:
+            logger.error(f"[BuildFeed] Error getting interest-based posts: {e}")
+
+    # Trending posts
+    if remaining > 0:
+        try:
+            posts = await trending_posts(db, limit=min(remaining, 10))
+            logger.info(f"[BuildFeed] Got {len(posts)} trending posts")
+            for p in posts:
+                out.append(("trending", p))
+            remaining = limit - len(out)
+        except Exception as e:
+            logger.error(f"[BuildFeed] Error getting trending posts: {e}")
+
+    # Nearby posts (if location available)
     if remaining > 0 and lat is not None and lon is not None:
-        for p in await nearby_posts(db, lat=lat, lon=lon, radius_meters=1500, limit=min(remaining, 15)):
-            out.append(("nearby", p))
-        remaining = limit - len(out)
+        try:
+            posts = await nearby_posts(db, lat=lat, lon=lon, radius_meters=1500, limit=min(remaining, 10))
+            logger.info(f"[BuildFeed] Got {len(posts)} nearby posts")
+            for p in posts:
+                out.append(("nearby", p))
+            remaining = limit - len(out)
+        except Exception as e:
+            logger.error(f"[BuildFeed] Error getting nearby posts: {e}")
 
+    # Personalized (Qdrant-based, currently stubbed)
     if remaining > 0:
-        for p in await personalized_posts(db, user_id=user_id, limit=min(remaining, 15)):
-            out.append(("personalized", p))
-        remaining = limit - len(out)
+        try:
+            posts = await personalized_posts(db, user_id=user.id, limit=min(remaining, 10))
+            logger.info(f"[BuildFeed] Got {len(posts)} personalized posts")
+            for p in posts:
+                out.append(("personalized", p))
+            remaining = limit - len(out)
+        except Exception as e:
+            logger.error(f"[BuildFeed] Error getting personalized posts: {e}")
 
+    # Recent fallback
     if remaining > 0:
-        result = await db.execute(select(Post).order_by(Post.created_at.desc()).limit(remaining))
-        for p in result.scalars().all():
-            out.append(("recent", p))
+        try:
+            result = await db.execute(select(Post).order_by(Post.created_at.desc()).limit(remaining))
+            posts = list(result.scalars().all())
+            logger.info(f"[BuildFeed] Got {len(posts)} recent posts")
+            for p in posts:
+                out.append(("recent", p))
+        except Exception as e:
+            logger.error(f"[BuildFeed] Error getting recent posts: {e}")
 
+    # Deduplicate
     seen: set[str] = set()
     deduped: list[tuple[str, Post]] = []
     for source, post in out:
@@ -118,4 +194,5 @@ async def build_feed(
         seen.add(post.id)
         deduped.append((source, post))
 
+    logger.info(f"[BuildFeed] Returning {len(deduped)} posts total")
     return deduped[:limit]

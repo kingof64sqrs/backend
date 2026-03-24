@@ -19,7 +19,7 @@ async def get_feed(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FeedResponse:
-    items = await build_feed(db, user_id=user.id, limit=limit, lat=lat, lon=lon)
+    items = await build_feed(db, user=user, limit=limit, lat=lat, lon=lon)
     return FeedResponse(
         items=[
             FeedItem(
