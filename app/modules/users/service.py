@@ -54,9 +54,27 @@ async def authenticate_user(db: AsyncSession, *, email: str, password: str) -> s
     return create_access_token(subject=user.id)
 
 
-async def update_profile(db: AsyncSession, *, user: User, name: str | None = None, interests: list[str] | None = None, lat: float | None = None, lon: float | None = None) -> User:
+async def update_profile(
+    db: AsyncSession,
+    *,
+    user: User,
+    name: str | None = None,
+    username: str | None = None,
+    avatar_url: str | None = None,
+    interests: list[str] | None = None,
+    lat: float | None = None,
+    lon: float | None = None,
+) -> User:
     if name is not None:
         user.name = name
+    if username is not None:
+        # Check uniqueness
+        existing = (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=409, detail="Username already taken")
+        user.username = username
+    if avatar_url is not None:
+        user.avatar_url = avatar_url
     if interests is not None:
         user.interests = _serialize_interests(interests)
     if lat is not None:

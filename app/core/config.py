@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import json
 from pathlib import Path
 
 from pydantic import AnyUrl
@@ -18,10 +19,8 @@ class Settings(BaseSettings):
     app_name: str = "Aroundyou API"
     api_v1_prefix: str = "/api/v1"
 
-    cors_origins: list[str] = [
-        "http://localhost:19006",
-        "http://localhost:8081",
-    ]
+    # Keep env parsing simple; parse into a list through `cors_origins_list`.
+    cors_origins: str = "http://localhost:19006,http://localhost:8081"
     cors_origin_regex: str = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
     database_url: str = "postgresql+asyncpg://aroundyou:aroundyou@localhost:5432/aroundyou"
@@ -41,6 +40,21 @@ class Settings(BaseSettings):
     # Startup behavior controls
     auto_schema_sync: bool = True
     auto_seed_dev_data: bool = True
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        raw = self.cors_origins.strip()
+        if not raw:
+            return []
+
+        # Support both JSON array format and simple comma-separated values.
+        if raw.startswith("["):
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [str(origin).strip() for origin in parsed if str(origin).strip()]
+            return []
+
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
 @lru_cache

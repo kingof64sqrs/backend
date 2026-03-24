@@ -8,7 +8,9 @@ class UserPublic(BaseModel):
     email: str
     phone: str | None = None
     name: str | None = None
-    interests: list[str] | None = None  # e.g., ["Cafes", "Events"]
+    username: str | None = None
+    avatar_url: str | None = None
+    interests: list[str] | None = None  # e.g., [\"Cafes\", \"Events\"]
     lat: float | None = None
     lon: float | None = None
 
@@ -30,6 +32,8 @@ class GoogleSignInRequest(BaseModel):
 
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
+    username: str | None = Field(default=None, max_length=40, pattern=r"^[a-z0-9_\.]{3,40}$")
+    avatar_url: str | None = Field(default=None, max_length=512)
     interests: list[str] | None = None
     lat: float | None = None
     lon: float | None = None
