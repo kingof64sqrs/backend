@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-import json
 from pathlib import Path
 
 from pydantic import AnyUrl, field_validator
@@ -27,16 +26,24 @@ class Settings(BaseSettings):
 
     @field_validator("cors_origins", mode="before")
     @classmethod
-    def parse_cors_origins(cls, value: object) -> object:
+    def parse_cors_origins(cls, value: object) -> str:
+        if isinstance(value, list):
+            return ",".join(str(origin).strip() for origin in value if str(origin).strip())
+
         if isinstance(value, str):
             value = value.strip()
             if not value:
-                return []
+                return ""
             # Accept either JSON array format or comma-separated list in .env.
             if value.startswith("["):
-                return json.loads(value)
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return ",".join(
+                        str(origin).strip() for origin in parsed if str(origin).strip()
+                    )
+            return value
+
+        return str(value)
 
     database_url: str = "postgresql+asyncpg://aroundyou:aroundyou@localhost:5432/aroundyou"
     redis_url: str = "redis://localhost:6380/0"
