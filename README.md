@@ -7,13 +7,13 @@ FastAPI backend for the City Discovery App.
 ### 1) Start infra (Postgres+PostGIS, Redis, Qdrant)
 
 ```bash
-sudo docker compose up -d
+sudo docker-compose up -d
 ```
 
 If you need to override host ports:
 
 ```bash
-POSTGRES_PORT=5433 REDIS_PORT=6381 sudo docker compose up -d
+POSTGRES_PORT=5433 REDIS_PORT=6381 sudo docker-compose up -d
 ```
 
 ### 2) Run API with `uv`
@@ -39,7 +39,7 @@ uv sync
 2. Start infra:
 
 ```bash
-sudo docker compose up -d
+sudo docker-compose up -d
 ```
 
 3. Start API with PM2:

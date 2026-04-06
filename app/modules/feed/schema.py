@@ -11,6 +11,10 @@ class FeedItem(BaseModel):
     place_id: str | None = None
     caption: str | None = None
     media_url: str | None = None
+    media_urls: list[str] = Field(default_factory=list)
+    hashtags: list[str] = Field(default_factory=list)
+    gem_type: str | None = None
+    aura_points: int = 0
     created_at: datetime
 
     source: str = Field(description="trending|nearby|personalized|recent")

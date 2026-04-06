@@ -10,6 +10,7 @@ class PlacePublic(BaseModel):
     lat: float
     lon: float
     metadata_json: str | None = None
+    post_count: int = 0  # Number of posts at this place
 
 
 class PlaceCreate(BaseModel):

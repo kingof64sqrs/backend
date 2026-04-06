@@ -98,9 +98,16 @@ def _verify_google_id_token(id_token_str: str) -> dict:
             id_token_str,
             google_requests.Request(),
             settings.google_web_client_id,
+            # Allow small server/client clock drift. Without this, even ~1s skew can break login.
+            clock_skew_in_seconds=10,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google token") from exc
+        # Provide more detail in dev to help diagnose issues like audience mismatch.
+        logger.warning("Google id_token verification failed: %s", exc)
+        detail = "Invalid Google token"
+        if settings.app_env.lower() in {"dev", "local"}:
+            detail = f"Invalid Google token: {exc}"
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail) from exc
 
     if payload.get("iss") not in {"accounts.google.com", "https://accounts.google.com"}:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google token issuer")

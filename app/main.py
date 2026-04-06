@@ -111,9 +111,31 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/auth/google/callback")
-    async def auth_google_callback(code: str, state: str | None = None) -> RedirectResponse:
+    async def auth_google_callback(
+        code: str | None = None,
+        state: str | None = None,
+        error: str | None = None,
+        error_description: str | None = None,
+    ) -> RedirectResponse:
+        success_url = _resolve_success_url(state)
+
+        def _redirect_with_error(message: str, description: str | None = None) -> RedirectResponse:
+            separator = "&" if "?" in success_url else "?"
+            redirect_params = {
+                "error": message,
+                "error_description": description or message,
+            }
+            return RedirectResponse(url=f"{success_url}{separator}{urlencode(redirect_params)}")
+
+        # Google can call back with error params (no code) for invalid requests or user cancellation.
+        if error:
+            return _redirect_with_error(error, error_description or "Google OAuth error")
+
+        if not code:
+            return _redirect_with_error("missing_code", "Missing authorization code from Google callback")
+
         if not settings.google_web_client_id or not settings.google_client_secret:
-            raise HTTPException(status_code=500, detail="Google OAuth is not fully configured")
+            return _redirect_with_error("oauth_not_configured", "Google OAuth is not fully configured")
 
         token_resp = requests.post(
             "https://oauth2.googleapis.com/token",
@@ -127,17 +149,20 @@ def create_app() -> FastAPI:
             timeout=15,
         )
         if token_resp.status_code >= 400:
-            raise HTTPException(status_code=401, detail="Google token exchange failed")
+            return _redirect_with_error("token_exchange_failed", "Google token exchange failed")
 
         token_json = token_resp.json()
         id_token = token_json.get("id_token")
         if not id_token:
-            raise HTTPException(status_code=401, detail="Missing id_token from Google")
+            return _redirect_with_error("missing_id_token", "Missing id_token from Google")
 
-        async with SessionLocal() as session:
-            app_token = await login_with_google(session, id_token_str=id_token)
+        try:
+            async with SessionLocal() as session:
+                app_token = await login_with_google(session, id_token_str=id_token)
+        except HTTPException as exc:
+            # Ensure Expo/AuthSession gets a redirect back to the app
+            return _redirect_with_error("google_signin_failed", str(exc.detail) if exc.detail else "Google sign-in failed")
 
-        success_url = _resolve_success_url(state)
         separator = "&" if "?" in success_url else "?"
         return RedirectResponse(url=f"{success_url}{separator}{urlencode({'token': app_token})}")
 

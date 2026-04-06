@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import DateTime, Float, String, Text
+from sqlalchemy import DateTime, Float, String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -22,4 +22,18 @@ class Place(Base):
     location: Mapped[object] = mapped_column(Geometry(geometry_type="POINT", srid=4326))
 
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+class Bookmark(Base):
+    __tablename__ = "bookmarks"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    place_id: Mapped[str] = mapped_column(String(36), ForeignKey("places.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+class Visit(Base):
+    __tablename__ = "visits"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    place_id: Mapped[str] = mapped_column(String(36), ForeignKey("places.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
